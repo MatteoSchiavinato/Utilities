@@ -1,0 +1,22 @@
+library("ggplot2")
+library("reshape2")
+#import multiplot
+
+x <- read.table("")
+
+P1 <- ggplot(data=x) + 
+theme(plot.title=element_text(family="sans", face="bold", colour="grey20", size=13),
+axis.title.x=element_text(family="helvetica", face="plain", colour="grey20", size=13),
+axis.title.y=element_text(family="helvetica", face="plain", colour="grey20", size=13),
+axis.text.x=element_text(family="sans", face="plain", colour="grey20", size=13),
+axis.text.y=element_text(family="sans", face="plain", colour="grey20", size=13),
+aspect.ratio=0.5) + 
+ggtitle("") + 
+# put your geom function here # 
+xlab("") + 
+ylab("") + 
+scale_x_continuous() + 
+scale_y_continuous()
+
+multiplot(P1)
+
