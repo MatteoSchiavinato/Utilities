@@ -1,0 +1,127 @@
+#!/usr/bin/env Rscript
+
+### USAGE: instsize.Rplot input.instsize
+###
+### To generate the input file, do samtools view [file.sam|bam] | cut -f9 | awk '$1>0' > [out.instsize]
+###
+### WARNING: the program will work efficiently only with subsets of mapped reads (say 100,000)
+
+
+
+
+
+library("ggplot2")
+library("reshape2")
+
+args = commandArgs(trailingOnly=TRUE)
+if (length(args) < 1) {
+	stop("One or more arguments missing. 1st argument: input file. 2nd argument: output file.")
+} else {
+	INFILE = args[1]
+	OUTSVG = paste(args[1], "svg", sep=".")
+}
+
+x <- read.table(INFILE)
+ypos <- max(density(x$V1)$y)
+ymax <- which.max(density(x$V1)$y)
+xpos <- density(x$V1)$x[ymax]
+labpos <- c(xpos, ypos)
+nf <- c(xpos/100*10, ypos/100*10)
+
+
+# define outer margins 
+
+xtopleft = min(density(x$V1)$x)
+ytopleft = density(x$V1)$y[which(density(x$V1)$x==xtopleft)]
+xtopright = max(density(x$V1)$x)
+ytopright = density(x$V1)$y[which(density(x$V1)$x==xtopright)]
+topleft = c(xtopleft, ytopleft)
+topright = c(xtopright, ytopright)
+
+
+# define left border 
+
+leftpos = ymax-1
+leftold = xpos
+left = density(x$V1)$y[leftpos]
+while ((left <= leftold || left >= ypos/100*80) && density(x$V1)$x[leftpos] > min(density(x$V1)$x)) {
+	leftold = left
+	leftpos = leftpos-1
+	left = density(x$V1)$y[leftpos]
+}
+yleft = which(density(x$V1)$y==left)
+xleft = density(x$V1)$x[yleft]
+leftlabpos = c(xleft, left)
+
+
+# define right border
+
+rightpos = ymax+1
+rightold = xpos
+right = density(x$V1)$y[rightpos]
+while ((right >= rightold || right <= ypos/100*120) && rightpos < length(density(x$V1)$y)) {
+	rightold = right
+	rightpos = rightpos+1
+	right = density(x$V1)$y[rightpos]
+}
+yright = which(density(x$V1)$y==right)
+xright = density(x$V1)$x[yright]
+rightlabpos = c(xright, right)
+
+
+# mirror smaller distance between peak and border
+
+distbord <- c(abs(xpos-xleft), abs(xpos-xright))
+idx <- which(distbord==min(distbord))
+if (idx == 1) {
+	xmir = min(xpos+min(distbord), max(density(x$V1)$x))
+	ymir = density(x$V1)$y[which.min(abs(density(x$V1)$x-xmir))]
+	mirbordpos = c(xmir, ymir)
+} else if (idx == 2) {
+	xmir = min(xpos-min(distbord), 0)
+	ymir = density(x$V1)$y[which.min(abs(density(x$V1)$x-xmir))]
+	mirbordpos = c(xmir, ymir)
+}
+
+# halfway mirror and left/right margin
+
+if (idx == 1) {
+	xhalf = xmir + abs(xmir-xright)/2
+	yhalf = density(x$V1)$y[which.min(abs(density(x$V1)$x-xhalf))]
+	halfbordpos = c(xhalf, yhalf)
+} else if (idx == 2) {
+	xhalf = xmir - abs(xmir-xleft)/2
+	yhalf = density(x$V1)$y[which.min(abs(density(x$V1)$x-xhalf))]
+	halfbordpos = c(xhalf, yhalf)
+}
+
+
+# compute dots positions
+
+dots <- as.data.frame(cbind(c("black", "red4", "red4", "orange", "orange", "blue", "blue"), rbind(labpos, leftlabpos, rightlabpos, mirbordpos, halfbordpos, topleft, topright)))
+colnames(dots) <- c("Color", "X", "Y")
+dotsXColor <- as.character(c("black", "red4", "red4", "orange", "orange", "blue", "blue"))
+dots$X <- as.numeric(as.character(dots$X))
+dots$Y <- as.numeric(as.character(dots$Y))
+
+
+# plot
+
+P1 <- ggplot(data=x, mapping=aes(x=V1)) + 
+theme(plot.title=element_text(family="sans", face="bold", colour="grey20", size=13),
+axis.title.x=element_text(family="helvetica", face="plain", colour="grey20", size=13),
+axis.title.y=element_text(family="helvetica", face="plain", colour="grey20", size=13),
+axis.text.x=element_text(family="sans", face="plain", colour="grey20", size=11),
+axis.text.y=element_text(family="sans", face="plain", colour="grey20", size=11),
+aspect.ratio=0.2) + 
+ggtitle("Insert size distribution") + 
+geom_density() + 
+geom_vline(data=dots, xintercept=dots$X, col=dots$Color, linetype=2) +
+geom_point(data=dots, mapping=aes(X,Y), col="black", stat="identity") +
+geom_label(data=dots, aes(X,Y,label=round(X,0)), size=3.5, col="black", nudge_x=nf[1], nudge_y=nf[2]) +
+xlab("Insert size") + 
+ylab("Kernel density")
+
+svg(OUTSVG)
+plot(P1)
+dev.off()
