@@ -1,0 +1,58 @@
+#!/usr/bin/env Rscript 
+
+library("ggplot2")
+args = commandArgs(trailingOnly=TRUE)
+
+if ((args[1] == "-h") | (args[1] == "--help")) {
+	cat("\n\nUsage:\n")
+	cat("plot-region-coverage.py <depthfile> <meancov> <title> [optional: <region> ]\n\n")
+	cat("<depthfile>\tOutput of samtools depth\n")
+	cat("<meancov>\tDraw a horizontal line at this coverage value for comparisons\n")
+	cat("<title>\t\tDelimit this argument with \" and \": what is between will be the title\n")
+	cat("<region>\t\tINT-INT (default: all)\n\n\n")
+	quit()
+}
+
+x <- as.data.frame(read.table(args[1], sep="\t"))
+myRed <- rgb(139, 0, 0, alpha=150, maxColorValue=255)
+if (length(args) >= 2) {
+	MEAN = as.numeric(args[2])
+	} else {
+	MEAN <- mean(x[,3])
+}
+if (length(args) >= 3) {
+	TITLE <- args[3]
+	} else {
+	TITLE <- "Coverage per position"
+}
+
+if (length(args) == 4) {
+	tmp <- unlist(strsplit(args[4], "-"))
+	START <- as.numeric(tmp[1])
+	END <- as.numeric(tmp[2])
+	} else {
+	START <- 1
+	END <- as.numeric(max(x[,2]))
+}
+
+outfile <- paste(args[1], paste(START, END, sep="-"), "svg", sep=".")
+
+
+P1 <- ggplot(data=x, mapping=aes(x=x[,2], y=x[,3], fill=myRed, col=myRed)) + 
+theme(plot.title=element_text(family="sans", face="bold", colour="grey20", size=12),
+axis.title.x=element_text(family="helvetica", face="plain", colour="grey20", size=12),
+axis.title.y=element_text(family="helvetica", face="plain", colour="grey20", size=12),
+axis.text.x=element_text(family="sans", face="plain", colour="grey20", size=12),
+axis.text.y=element_text(family="sans", face="plain", colour="grey20", size=12),
+aspect.ratio=0.15) + 
+ggtitle(TITLE) + 
+geom_bar(stat="identity", show.legend=F) +  
+geom_hline(yintercept=MEAN, col="black", linetype=2) +
+xlab("Position") + 
+ylab("Coverage") + 
+scale_x_continuous(limits=c(START, END)) + 
+scale_y_continuous()
+
+svg(outfile)
+plot(P1)
+dev.off()
