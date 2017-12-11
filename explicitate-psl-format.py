@@ -1,5 +1,25 @@
 #!/usr/bin/env python2.7
 
+# This program explicitates the usual calculations performed on PSL formatted files, generating an "ePSL" (explicit PSL) file. 
+# File format fields are:
+# 1. (Q) query
+# 2. (QLen) query length
+# 3. (T) target
+# 4. (TLen) target length
+# 5. (M) number of matches
+# 6. (MM) number of mismatches 
+# 7. (QGL) query gap length (as in PSL format)
+# 8. (TGL) target gap length (as in PSL format)
+# 9. (SeqID) sequence identity (of the aligned portion)
+# 10. (QSeqID) sequence identity (of the query)
+# 11. (TSeqID) sequence identity (of the target)
+# 12. (ALen) alignment length
+# 13. (QFrac) query aligned fraction
+# 14. (TFrac) target aligned fraction
+# 15. (BSize) block size (as in PSL format)
+# 16. (QStart) block start positions on query (as in PSL format)
+# 17. (TStart) block start positions on target (as in PSL format)
+
 import sys
 import argparse as ap
 
