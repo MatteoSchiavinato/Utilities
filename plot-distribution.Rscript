@@ -5,23 +5,43 @@ library("reshape2")
 
 args <- commandArgs(trailingOnly=T)
 
-if ((args[1] == "-h") | (args[1] == "--help")) {
+if ((args[1] == "-h") | (args[1] == "--help") | (args[1] == "-help")) {
 	cat("\n\nUSAGE:\n")
-	cat("plot-distribution.Rscript [FILE] [RANGE]\n")
+	cat("plot-distribution.Rscript [OPTIONS]")
 	cat("\n")
-	cat("FILE  -> values to be plotted, one per line, no header, no row names\n")
-	cat("RANGE -> specify a minimum and a maximum value separated by a comma (min,max)\n\n\n")
+	cat("FILE=filename	values to be plotted, one per line, no header, no row names\n")
+	cat("RANGE=NUM,NUM	specify a minimum and a maximum value separated by a comma (min,max)\n")
+	cat("XSTEP=NUM		x-axis step size (used to draw label ticks)\n")
+	cat("OUT=filename	output svg format file\n")
+	cat("\n\n")
 	quit()
 }
 
-x <- read.table(args[1])
-x[,1] <- as.numeric(x[,1])
-title = ""
+argslist = list()
+for (entry in args) {
+	tmp <- unlist(strsplit(entry, "="))
+	argslist[[tmp[1]]] = tmp[2]
+}
 
-if (length(args)==1) {
+x <- read.table(argslist$FILE)
+x[,1] <- as.numeric(x[,1])
+
+if ("RANGE" %in% names(argslist)) { 
+	range <- as.numeric(unlist(strsplit(argslist$RANGE, ",")))
+} else {
 	range=c(min(x[,1]), max(x[,1]))
-} else { 
-	range <- unlist(strsplit(args[3], ","))
+}
+
+if ("XSTEP" %in% names(argslist)) {
+	breaks=seq(range[1], range[2], as.numeric(as.character(argslist$XSTEP)))
+} else {
+	breaks=seq(range[1], range[2], 50)
+}
+
+if ("OUT" %in% names(argslist)) {
+	outfile <- argslist$OUT
+} else {
+	outfile <- "out.svg"
 }
 
 ypos <- max(density(x$V1)$y)
@@ -44,16 +64,16 @@ axis.text.x=element_text(family="sans", face="plain", colour="grey20", size=11),
 axis.text.y=element_text(family="sans", face="plain", colour="grey20", size=11),
 plot.margin=unit(c(2,2,2,2), "cm"),
 aspect.ratio=0.3) + 
-ggtitle(title) + 
+ggtitle("") + 
 geom_freqpoly(binwidth=1, size=0.8) + 
 geom_vline(data=dots, xintercept=dots$X, col=dots$Color, linetype=2) +
 geom_point(data=dots, mapping=aes(X,Y), col="black", stat="identity") +
 geom_label(data=dots, aes(X,Y,label=round(X,0)), size=3.5, col="black", nudge_x=nf[1], nudge_y=nf[2]) +
 xlab("Range") + 
 ylab("Amount") + 
-scale_x_continuous(limits=c(as.numeric(range[1]), as.numeric(range[2]))) + 
+scale_x_continuous(breaks=breaks, limits=c(as.numeric(range[1]), as.numeric(range[2]))) + 
 scale_y_continuous() + 
 
-svg(paste(args[1], "svg", sep="."))
+svg(outfile)
 plot(P1)
 dev.off()
