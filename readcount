@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+FILE=$1
+
+{
+echo -e "COUNT\tFLAG\tMEANING"
+for i in `awk 'substr($1, 0, 1)!="@"' $1 | cut -f 2 | sort | uniq -c | tr -s " " "\t" | cut -f 2- | sort -k1nr,1 | tr "\t" "_"`
+do
+COUNT=$(echo $i | cut -d "_" -f 1)
+FLAG=$(echo $i | cut -d "_" -f 2)
+MEANING=$(samtools flags $FLAG | cut -f 3)
+echo -e $COUNT"\t"$FLAG"\t"$MEANING
+done
+} | column -t 
