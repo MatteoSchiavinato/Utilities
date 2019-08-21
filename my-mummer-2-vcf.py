@@ -15,7 +15,7 @@ if sys.argv[1] in ["-h", "--help", "getopt", "usage", "-help", "help"]:
 USAGE:  my-mummer-2-vcf.py [ options ]
 
 Convert Mummer SNP/indel output as produced by the 'show-snps -T' command to
-a pseudo-VCF format.
+a VCF format.
 
 OPTIONS:
 
