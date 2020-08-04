@@ -3,8 +3,8 @@
 import argparse
 import sys
 from time import strftime
-from Bio import SeqIO 
-from operator import itemgetter 
+from Bio import SeqIO
+from operator import itemgetter
 
 if len(sys.argv) <= 1:
 	sys.argv.append("-h")
@@ -15,11 +15,13 @@ if sys.argv[1] in ["-h", "--help", "getopt", "usage", "-help", "help"]:
 USAGE:  my-mummer-2-vcf.py [ options ]
 
 Convert Mummer SNP/indel output as produced by the 'show-snps -T' command to
-a VCF format.
+a pseudo-VCF format.
 
 OPTIONS:
 
     -s|--snps		    	Mummer "snps" file (output of 'show-snps -T')
+				(mandatory)
+    -g|--reference		Reference genome FASTA file for header generation
 				(mandatory)
 
        --input-header		Use this flag if the file has a header
@@ -30,26 +32,23 @@ OPTIONS:
     -t|--type   SNP|INDEL|ALL   Restrict the output to just SNPs or indels
 				(default: ALL)
 
-       --output-header		Add a newly-generated VCF header to the output 
-				(Requires also --reference)
-
-    -g|--reference		Reference genome FASTA file for header generation
+       --output-header		Add a newly-generated VCF header to the output
 
 ''')
 
 
-# parser 
+# parser
 p = argparse.ArgumentParser()
 p.add_argument("-s", "--snps", required=True)
+p.add_argument("-g", "--reference", required=True)
 p.add_argument("--input-header", action="store_true")
 p.add_argument("-n", "--no-Ns", action="store_true")
 p.add_argument("-t", "--type", choices=["SNP", "INDEL", "ALL"], default="ALL")
 p.add_argument("--output-header", action="store_true")
-p.add_argument("-g", "--reference")
 args = p.parse_args()
 
 
-### conditions ### 
+### conditions ###
 
 if (args.output_header) and not args.reference:
 	sys.exit("ERROR: --add-vcf-header requires --reference as well\n\n")
@@ -91,7 +90,7 @@ def infer_var_type(Vcf_lines):
 	Vcf_lines_w_types = []
 	for line in Vcf_lines:
 		(scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos) = line.rstrip("\n\r\b").split("\t")
-		
+
 		if ((len(ref)==1) and ("." not in ref) and \
 		(len(alt)==1) and ("." not in alt)):
 			var_type = "."
@@ -100,7 +99,7 @@ def infer_var_type(Vcf_lines):
 			var_type = "INDEL"
 
 		Vcf_lines_w_types.append("\t".join((scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos)))
-	
+
 	return Vcf_lines_w_types
 
 
@@ -133,11 +132,11 @@ def collapse_indels(Indels):
 
 		if len(Collapsed_indels) == 0:
 			Collapsed_indels.append([scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos])
-	
+
 		elif ((int(pos) == pos_old) and (ref == ".")) or \
 		     ((int(pos) == pos_old+1) and (alt == ".")):
 
-			# insertions 
+			# insertions
 			if ref == ".":
 				Tmp_insertions = Collapsed_indels[-1][4].split(",")
 
@@ -146,14 +145,14 @@ def collapse_indels(Indels):
 					Collapsed_indels[-1][4] = x
 
 				elif orig_pos == orig_pos_old:
-					### NEW INDELS ### 
+					### NEW INDELS ###
 					indel = Collapsed_indels[-1][4]
 					Collapsed_indels[-1][4] = ",".join([indel,
 								  str(indel[0:len(indel)-1]) + str(alt)])
 			# deletions
 			elif alt == ".":
 				Collapsed_indels[-1][3] = str(Collapsed_indels[-1][3]) + str(ref)
-	
+
 		else:
 			Collapsed_indels.append([scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos])
 
@@ -221,7 +220,7 @@ def collapse_variants(Reference, Vcf_lines):
 	Sorted_snps = [ "\t".join([str(y) for y in x]) for x in sorted(Sorted_snps, key=itemgetter(1)) ]
 	Collapsed_snps = collapse_snps(Sorted_snps)
 
-	### indels ### 
+	### indels ###
 	Indel_tuples = []
 	for line in Indels:
 		(scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos) = line.rstrip("\n\r\b").split("\t")
@@ -230,7 +229,7 @@ def collapse_variants(Reference, Vcf_lines):
 
 	Indels = [ "\t".join([str(y) for y in x]) for x in Indel_tuples ]
 	Collapsed_indels = collapse_indels(Indels)
-	### add prior base to indels ### 
+	### add prior base to indels ###
 	Collapsed_indels = add_indel_first_base(Collapsed_indels, Sequences)
 
 	Vcf_lines = []
@@ -239,10 +238,10 @@ def collapse_variants(Reference, Vcf_lines):
 	for y in Collapsed_indels:
 		Vcf_lines.append(y)
 
-	### sort ### 
+	### sort ###
 	Vcf_lines = sorted(Vcf_lines, key=itemgetter(1))
 
-	### return ### 
+	### return ###
 	Vcf_lines = [ "\t".join([str(y) for y in x]) for x in Vcf_lines ]
 	return Vcf_lines
 
@@ -310,7 +309,7 @@ def add_header(Reference, Vcf_lines):
 	return Final_lines
 
 
-# main script 
+# main script
 if __name__ == "__main__":
 	infile = args.snps
 	INPUT = open(infile, "r")
