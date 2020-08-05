@@ -87,9 +87,10 @@ if __name__ == "__main__":
         sys.stderr.write("[{0}] Processing {1}\n".format(at(), input_file))
 
         # read file
-        df = dd.read_csv(input_file, sep="\t", names=["Classification", "Read_name", "Taxid", "V1", "V2"],
-                    dtype={"Classification":"object", "Read_name":"object", "Taxid":"object", "V1":"object", "V2":"object"})
-        df = df.loc[:,["Classification", "Taxid"]]
+        df = dd.read_csv(input_file, sep="\t")
+        df = df.iloc[:,[0,2]]
+        df.columns = ["Classification", "Taxid"]
+        df = df.astype({"Classification":"object", "Taxid":"object"})
         df = df.repartition(npartitions=args.threads)
 
         # count taxa
