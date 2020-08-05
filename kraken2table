@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+
+import sys
+import argparse as ap
+from time import asctime as at
+from ete3 import NCBITaxa
+import multiprocessing as mp
+import dask
+import dask.dataframe as dd
+
+# parser
+p = ap.ArgumentParser()
+p.add_argument("-i", "--input-files", required=True, help="Name of input files (SPACE-separated).", nargs="*")
+p.add_argument("-o", "--output-file", required=True, help="Name of output file.")
+p.add_argument("-p", "--threads", default=1, help="Number of parallel processes", type=int)
+p.add_argument("-r", "--rank", default="species", help="Taxonomic rank to be output, all lowercase (Default: species)")
+p.add_argument("-m", "--min-frac", help="Number in [0, 100], denoting the minimum required percentage for the taxon (except viruses) to be reported (default: 0.0)", default=0.0, type=float)
+p.add_argument("-c", "--min-count", help="Integer number > 0, denoting the minimum required number of reads for the taxon (except viruses) to be reported (default: 0)", default=0, type=int)
+p.add_argument("-u", "--exclude-unclassified", help="Unclassified reads are not counted for the total reads when calculating percentages for classified reads.", default=False, action="store_true")
+args = p.parse_args()
+
+if (args.min_frac > float(100) or (args.min_frac < float(0))):
+    sys.stderr.write("[{0}] ERROR: The declared value for --min-frac must be within 0.0 and 100.0\n\n".format(at()))
+    sys.exit(1)
+
+if (args.min_frac != 0 and args.min_count != 0):
+    sys.stderr.write("[{0}] ERROR: Only one of the options -m and -c may be used at a time.\n\n".format(at()))
+    sys.exit(1)
+
+
+# download NCBI taxa
+sys.stderr.write("[{0}] If you're using this program for the first time, there will be a download step in short... \n".format(at()))
+ncbi = NCBITaxa()
+sys.stderr.write("[{0}] Download complete. This step won't happen again!\n".format(at()))
+
+# functions
+
+def adjust_taxid(taxid, args):
+
+    if int(taxid) > 0:
+        try:
+            Lineage = ncbi.get_lineage(taxid)
+        except ValueError:
+            Lineage = []
+
+        if len(Lineage) > 0:
+            Lineage = ncbi.get_rank(ncbi.get_lineage(taxid))
+            Selected_lineage = [ i for i in Lineage.keys() if Lineage[i]==args.rank ]
+
+            if (len(Selected_lineage) == 1 ):
+                downgraded_taxid = int(Selected_lineage[0])
+            else:
+                downgraded_taxid = 0
+            return downgraded_taxid
+        else:
+            return 0
+    else:
+        return 0
+
+
+def get_tax_name(taxid):
+    #
+    if int(taxid) != 0:
+        try:
+            taxname = ncbi.get_taxid_translator([int(taxid)])[int(taxid)]
+        except KeyError:
+            taxname = "Unclassified"
+    else:
+        taxname = "Unclassified"
+    #
+    return taxname
+
+# process
+if __name__ == "__main__":
+
+    sys.stderr.write("\n[{0}] ### BEGIN ###\n\n".format(at()))
+
+    # create output file
+    OUTPUT = open(args.output_file, "w")
+    Header = "\t".join(["file", "percent", "reads", "taxon_id", "taxon_name"]) + "\n"
+    OUTPUT.write(Header)
+    OUTPUT.close()
+
+    for input_file in args.input_files:
+
+        # stderr
+        sys.stderr.write("[{0}] Processing {1}\n".format(at(), input_file))
+
+        # read file
+        df = dd.read_csv(input_file, sep="\t", names=["Classification", "Read_name", "Taxid", "V1", "V2"],
+                    dtype={"Classification":"object", "Read_name":"object", "Taxid":"object", "V1":"object", "V2":"object"})
+        df = df.loc[:,["Classification", "Taxid"]]
+        df = df.repartition(npartitions=args.threads)
+
+        # count taxa
+        df = df.groupby("Taxid").count().compute(nthreads=args.threads)
+        df = df.reset_index()
+        df.columns = ["Taxid", "Counts"]
+
+        # add taxname
+        df["Taxname"] = df["Taxid"].apply(lambda x : get_tax_name(x) )
+
+        # adjust taxa depending on --rank
+        df["Taxid"] = df["Taxid"].apply(lambda x : adjust_taxid(x, args) )
+        df = df.groupby("Taxid").sum()
+        df = df.reset_index()
+        df.columns = ["Taxid", "Counts"]
+        df["Taxname"] = df["Taxid"].apply(lambda x : get_tax_name(x) )
+
+        # exclude unclassified if required
+        if args.exclude_unclassified == True:
+            df = df[(df.Taxname != "Unclassified") & (df.Taxname != "root")]
+            df = df.reset_index()
+            df = df.iloc[:,1:]
+
+        if args.min_count > 0:
+            # collapse the counts below --min-count to "Other"
+            # by default the --min-count is 0 so this operation would be done only if the value is above 0
+            Other = df[df.Counts < args.min_count].sum()
+            df = df[df.Counts >= args.min_count]
+            Other.Taxname = "Other"
+            Other.Taxid = "NA"
+            Other = Other.rename("Other")
+            df = df.append(other=Other)
+            df = df.astype({"Taxid":"object", "Counts":"uint64", "Taxname":"object"})
+
+        # calculate fractions
+        df["Fraction"] = (df["Counts"] / df["Counts"].sum()) * 100
+
+        if args.min_frac > float(0):
+            # collapse the fractions below --min-frac to "Other"
+            # by default the --min-frac is 0 so this operation would be done only if the value is above 0
+            Other = df[df.Fraction < args.min_frac].sum()
+            df = df[df.Fraction >= args.min_frac]
+            Other.Taxname = "Other"
+            Other.Taxid = "NA"
+            Other = Other.rename("Other")
+            df = df.append(other=Other)
+            df = df.astype({"Taxid":"object", "Counts":"uint64", "Taxname":"object", "Fraction":"float16"})
+
+        # re-calculate fractions
+        df["Fraction"] = (df["Counts"] / df["Counts"].sum()) * 100
+
+        # add filename
+        df["Filename"] = input_file
+        df = df.loc[:,["Filename", "Fraction", "Counts", "Taxid", "Taxname"]]
+        df.columns = ["file", "percent", "reads", "taxon_id", "taxon_name"]
+
+        # write to output
+        OUTPUT = open(args.output_file, "a")
+        for index, row in df.iterrows():
+            line = "\t".join([ str(i) for i in row.tolist() ]) + "\n"
+            OUTPUT.write(line)
+
+        OUTPUT.close()
+
+    sys.stderr.write("\n[{0}] ### DONE ###\n\n".format(at()))
