@@ -4,7 +4,6 @@ import sys
 import argparse as ap
 from time import asctime as at
 from ete3 import NCBITaxa
-import multiprocessing as mp
 import dask
 import dask.dataframe as dd
 
