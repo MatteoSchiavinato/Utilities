@@ -12,7 +12,7 @@ import dask.dataframe as dd
 p = ap.ArgumentParser()
 p.add_argument("-i", "--input-files", required=True, help="Name of input files (SPACE-separated).", nargs="*")
 p.add_argument("-o", "--output-file", required=True, help="Name of output file.")
-p.add_argument("-p", "--threads", default=1, help="Number of parallel processes", type=int)
+p.add_argument("-p", "--threads", default=1, help="Number of parallel threads", type=int)
 p.add_argument("-r", "--rank", default="species", help="Taxonomic rank to be output, all lowercase (Default: species)")
 p.add_argument("-m", "--min-frac", help="Number in [0, 100], denoting the minimum required percentage for the taxon (except viruses) to be reported (default: 0.0)", default=0.0, type=float)
 p.add_argument("-c", "--min-count", help="Integer number > 0, denoting the minimum required number of reads for the taxon (except viruses) to be reported (default: 0)", default=0, type=int)
