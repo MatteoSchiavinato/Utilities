@@ -86,7 +86,7 @@ if __name__ == "__main__":
         sys.stderr.write("[{0}] Processing {1}\n".format(at(), input_file))
 
         # read file
-        df = dd.read_csv(input_file, sep="\t")
+        df = dd.read_csv(input_file, sep="\t", dtype="object")
         df = df.iloc[:,[0,2]]
         df.columns = ["Classification", "Taxid"]
         df = df.astype({"Classification":"object", "Taxid":"object"})
