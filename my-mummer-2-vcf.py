@@ -112,6 +112,9 @@ def collapse_snps(Sorted_snps):
 			Collapsed_snps.append([scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos])
 
 		elif int(pos) == pos_old:
+			orig_pos_lst = str(Collapsed_snps[-1][8]).split(",")
+			orig_pos_lst.append(str(orig_pos))
+			Collapsed_snps[-1][8] = ",".join(orig_pos_lst)
 			alt_lst = str(Collapsed_snps[-1][4]).split(",")
 			if str(alt) not in alt_lst:
 				alt_lst.append(str(alt))
@@ -217,7 +220,7 @@ def collapse_variants(Reference, Vcf_lines):
 		pos = int(pos)
 		Sorted_snps.append((scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos))
 
-	Sorted_snps = [ "\t".join([str(y) for y in x]) for x in sorted(Sorted_snps, key=itemgetter(1)) ]
+	Sorted_snps = [ "\t".join([str(y) for y in x]) for x in sorted(Sorted_snps, key=itemgetter(0,1)) ]
 	Collapsed_snps = collapse_snps(Sorted_snps)
 
 	### indels ###
