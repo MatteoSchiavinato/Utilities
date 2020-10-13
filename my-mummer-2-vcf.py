@@ -129,29 +129,66 @@ def collapse_snps(Sorted_snps):
 
 
 def collapse_indels(Indels):
+	# initialize list of collapsed indels
 	Collapsed_indels = []
+
+	# iterate over each line of the indels (i.e. each indel)
 	for line in Indels:
+		# split the line into the fields
 		(scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos) = line.rstrip("\n\r\b").split("\t")
 
+		# ------------------------------------------------------------------
+		# first iteration // Collapsed_indels is long 0 (no elements inside)
 		if len(Collapsed_indels) == 0:
+			# append the fields that were just generated
 			Collapsed_indels.append([scaffold, pos, ID, ref, alt, qual, filt, var_type, orig_pos])
 
-		elif ((int(pos) == pos_old) and (ref == ".")) or \
-		     ((int(pos) == pos_old+1) and (alt == ".")):
+		# -------------------------------------------------------------
+		# from second iteration on // Collapsed_indels is longer than 0
+		# indel position is compared to the previous inserted (pos_old)
+		# this happens because the input file is sorted by position
+		# if ref is "." (insertion) and the position is the same (pos == pos_old)
+		# or if alt is "." (deletion) and the position is the next one (pos == pos_old+1)
+		# why +1:
+		# each deletion represents a position that is removed in the reads
+		# hence, a deletion of 10 nt would occupy 10 lines
+		# which means that it will be pos_old+1 each iteration
+		#
+		# on the contrary, insertions are all anchored to the position of the reference
+		# after which they insert
+		# this because they are not present in the reference
+		# so we don't need the pos_old +1, but just the pos_old
+		# for the comparison
+		elif ((int(pos) == pos_old) and (ref == ".") and (orig_pos == orig_pos_old)) or \
+		     ((int(pos) == pos_old+1) and (alt == ".") and (orig_pos == orig_pos_old)):
 
+			# ----------
 			# insertions
 			if ref == ".":
+				# take the last element of the collapsed indels [-1]
+				# extract all its available alternative alleles (5th field, i.e. [4])
+				# split them by comma ","
+				# these are the insertions we have so far
 				Tmp_insertions = Collapsed_indels[-1][4].split(",")
 
+				# if the current insertion's original position (orig_pos)
+				# is not the same as the one of the previous insertion (orig_pos_old)
 				if orig_pos != orig_pos_old:
+					# add the new alternative position to all present insertions
+					# one by one
 					x = ",".join([str(indel) + str(alt) for indel in Tmp_insertions])
+					# reassign the alternative allele field
+					# of the last collapsed_indels record
 					Collapsed_indels[-1][4] = x
 
+				# what if
 				elif orig_pos == orig_pos_old:
 					### NEW INDELS ###
 					indel = Collapsed_indels[-1][4]
 					Collapsed_indels[-1][4] = ",".join([indel,
 								  str(indel[0:len(indel)-1]) + str(alt)])
+
+			# ---------
 			# deletions
 			elif alt == ".":
 				Collapsed_indels[-1][3] = str(Collapsed_indels[-1][3]) + str(ref)
